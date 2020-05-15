@@ -1,8 +1,8 @@
-import React, {useState, FormEvent} from 'react';
+import React, {useState, FormEvent, useEffect} from 'react';
 import {FiChevronRight} from  'react-icons/fi';
 
 import logoImg from '../../assets/logo.svg';
-import {Title, Form, Repositories} from './styles';
+import {Title, Form, Repositories, Error} from './styles';
 
 import api from '../../services/api';
 
@@ -17,17 +17,42 @@ interface Repository {
 
 const Dashboard: React.FC = () => {
   const [newRepo, setNewRepo] = useState(''); //armazenar o valor do input
-	const [repositories, setRepositories] = useState<Repository[]>([]);
+  const [inputError, setInputError] = useState('');
 
-  async function handleAddRepositoriy(event: FormEvent<HTMLFormElement>) : Promise<void> {
-		event.preventDefault();
+  const [repositories, setRepositories] = useState<Repository[]> ( () => {
+    const storagedRepositories = localStorage.getItem('@GithubExplorer:repositories');
 
-		const response = await api.get<Repository>(`repos/${newRepo}`);
+    if(storagedRepositories) {
+      return JSON.parse(storagedRepositories);
+    } else {
+      return [];
+    }
+  });
 
-		const repository = response.data;
+  useEffect( () => {
+    localStorage.setItem('@GithubExplorer:repositories', JSON.stringify(repositories))
+  }, [repositories] );
 
-		setRepositories([...repositories, repository]);
-		setNewRepo('');
+
+  async function handleAddRepository(event: FormEvent<HTMLFormElement>) : Promise<void> {
+    event.preventDefault();
+    if(!newRepo) {
+      setInputError('Digite autor/nome do respositorio');
+      return;
+    }
+    try {
+      const response = await api.get<Repository>(`repos/${newRepo}`);
+
+      const repository = response.data;
+
+      setRepositories([...repositories, repository]);
+      setNewRepo('');
+      setInputError('');
+    } catch (Err) {
+      setInputError('Erro na busca por esse repositorio');
+    }
+
+
 	}
 
   return (
@@ -35,7 +60,7 @@ const Dashboard: React.FC = () => {
       <img src={logoImg} alt="Github Explorer" />
       <Title>Explore Repositorios no GitHub</Title>
 
-      <Form onSubmit={handleAddRepositoriy}>
+      <Form hasError={!!inputError} onSubmit={handleAddRepository}>
         <input
           value={newRepo}
           onChange={ (e) => setNewRepo(e.target.value)}
@@ -43,7 +68,7 @@ const Dashboard: React.FC = () => {
         />
 				<button type="submit">Pesquisar</button>
 			</Form>
-
+      {inputError && <Error>{inputError}</Error>}
       <Repositories>
 		{repositories.map(repository => (
 				<a key={repository.full_name} href="teste">
